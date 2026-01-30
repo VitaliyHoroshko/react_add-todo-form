@@ -4,8 +4,13 @@ import { useState } from 'react';
 import usersFromServer from './api/users';
 import todosFromServer from './api/todos';
 
+const preparedTodos = todosFromServer.map(todo => ({
+  ...todo,
+  user: usersFromServer.find(user => user.id === todo.userId) || null,
+}));
+
 export const App = () => {
-  const [listTodos, setListTodos] = useState(todosFromServer);
+  const [listTodos, setListTodos] = useState(preparedTodos);
   const [title, setTitle] = useState('');
   const [userId, setUserId] = useState<number | null>(null);
   const [hasTitleError, setHasTitleError] = useState(false);
@@ -29,13 +34,14 @@ export const App = () => {
       return;
     }
 
-    const selectedUser = usersFromServer.find(u => u.id === userId);
-    const newId = Math.max(0, ...listTodos.map(t => t.id)) + 1;
+    const selectedUser =
+      usersFromServer.find(user => user.id === userId) || null;
+    const newId = Math.max(0, ...listTodos.map(todo => todo.id)) + 1;
 
     const newTodo = {
       id: newId,
       title: title.trim(),
-      userId: userId,
+      userId: userId as number,
       completed: false,
       user: selectedUser,
     };
@@ -50,14 +56,19 @@ export const App = () => {
     <div className="App">
       <h1>Add todo form</h1>
 
-      <form action="/api/todos" method="POST" onSubmit={handleSubmit}>
+      <form onSubmit={handleSubmit}>
         <div className="field">
+          <label htmlFor="todo-title">Title</label>
           <input
+            id="todo-title"
             type="text"
             data-cy="titleInput"
+            placeholder="Enter todo title"
             value={title}
-            onChange={e => {
-              setTitle(e.target.value);
+            onChange={event => {
+              setTitle(
+                event.target.value.replace(/[^a-zA-Zа-яА-ЯіІєЄїЇґҐ0-9 ]/g, ''),
+              );
               setHasTitleError(false);
             }}
           />
@@ -65,11 +76,13 @@ export const App = () => {
         </div>
 
         <div className="field">
+          <label htmlFor="todo-user">User</label>
           <select
+            id="todo-user"
             data-cy="userSelect"
             value={userId ?? 0}
-            onChange={e => {
-              setUserId(Number(e.target.value));
+            onChange={event => {
+              setUserId(Number(event.target.value));
               setHasUserError(false);
             }}
           >
@@ -91,23 +104,21 @@ export const App = () => {
       </form>
 
       <section className="TodoList">
-        {listTodos.map(todo => {
-          const user = usersFromServer.find(u => u.id === todo.userId);
+        {listTodos.map(todo => (
+          <article
+            key={todo.id}
+            data-id={todo.id}
+            className={`TodoInfo ${todo.completed ? 'TodoInfo--completed' : ''}`}
+          >
+            <h2 className="TodoInfo__title">{todo.title}</h2>
 
-          return (
-            <article
-              key={todo.id}
-              data-id={todo.id}
-              className={`TodoInfo ${todo.completed ? 'TodoInfo--completed' : ''}`}
-            >
-              <h2 className="TodoInfo__title">{todo.title}</h2>
-
-              <a className="UserInfo" href={`mailto:${user?.email}`}>
-                {user?.name}
+            {todo.user && (
+              <a className="UserInfo" href={`mailto:${todo.user.email}`}>
+                {todo.user.name}
               </a>
-            </article>
-          );
-        })}
+            )}
+          </article>
+        ))}
       </section>
     </div>
   );
